@@ -14,13 +14,16 @@ export async function reply(phoneNumber: string, msg: string) {
   const embedding = await createEmbedding(msg);
   const chunks = await findNearestMatch(embedding);
 
-  if (!chunks) {
-    return "No relevant documents found. Please upload documents first.";
+  console.log("Found chunks:", chunks);
+
+  let userMessageContent = msg;
+  if (chunks && chunks.length > 0) {
+    userMessageContent = `Context: ${chunks[0].content}\n\nQuestion: ${msg}`;
   }
 
   conversation?.push({
     role: "user",
-    content: `Context: ${chunks[0].content}\n\nQuestion: ${msg}`
+    content: userMessageContent
   });
 
   // Using Google Gemini for text generation

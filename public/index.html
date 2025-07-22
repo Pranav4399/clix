@@ -30,7 +30,13 @@
     <!-- Documents Table -->
     <div class="bg-white rounded-xl shadow p-6">
       <h2 class="text-xl font-semibold mb-4">Uploaded Documents</h2>
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto relative">
+        <div id="tableLoader" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden">
+          <div class="flex items-center space-x-2">
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span class="text-lg text-gray-600">Loading documents...</span>
+          </div>
+        </div>
         <table class="min-w-full border border-gray-200">
           <thead>
             <tr class="bg-gray-50">
@@ -51,7 +57,16 @@
     const uploadBtn = document.getElementById("uploadBtn");
     const uploadStatusEl = document.getElementById("uploadStatus");
     const tableBody = document.getElementById("documentsTable");
+    const tableLoader = document.getElementById("tableLoader");
     let pollingInterval;
+
+    function showTableLoader() {
+      tableLoader.classList.remove("hidden");
+    }
+
+    function hideTableLoader() {
+      tableLoader.classList.add("hidden");
+    }
 
     function updateFileName() {
       fileNameEl.textContent = fileInput.files.length ? fileInput.files[0].name : "Click to choose a file... (.pdf, .docx, .txt)";
@@ -100,6 +115,7 @@
     }
 
     function renderTable(documents) {
+      hideTableLoader(); // Hide loader once content is rendered
       if (!documents.length) {
         tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">No documents uploaded yet.</td></tr>`;
         return;
@@ -115,6 +131,7 @@
     }
 
     async function loadDocuments() {
+      showTableLoader(); // Show loader before fetching
       try {
         const response = await fetch("/documents");
         const documents = await response.json();
@@ -126,6 +143,11 @@
       } catch (err) {
         console.error("Load error:", err);
         tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">Failed to load documents.</td></tr>`;
+      } finally {
+        // In case of error, ensure loader is hidden
+        if (tableLoader.classList.contains("hidden")) {
+          hideTableLoader();
+        }
       }
     }
 

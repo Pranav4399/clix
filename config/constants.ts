@@ -27,7 +27,7 @@ export const textSplitterConfig = {
 };
 
 export const searchConfig = {
-  match_threshold: 0.78,
+  match_threshold: 0.5,
   match_count: 3, // Get top 3 most relevant chunks
 };
 
