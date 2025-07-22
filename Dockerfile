@@ -24,6 +24,8 @@ WORKDIR /usr/src/app
 COPY --from=dependencies /usr/src/app/node_modules ./node_modules
 # Copy compiled code from the build stage
 COPY --from=build /usr/src/app/dist ./dist
+# Copy static assets
+COPY --from=build /usr/src/app/public ./public
 # Copy package.json for the start script
 COPY --from=build /usr/src/app/package.json ./
 
