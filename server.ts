@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // Routes
-app.use("/", webhookRoutes);
+app.use("/webhook", webhookRoutes);
 app.use("/documents", documentRoutes); // for GET /documents
 
 // Health check endpoint
