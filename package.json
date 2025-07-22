@@ -1,0 +1,55 @@
+{
+  "name": "blog-walkthrough",
+  "version": "1.0.0",
+  "description": "AI-powered financial services assistant with document processing and WhatsApp integration",
+  "main": "dist/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "dev": "nodemon --exec ts-node server.ts",
+    "start": "node dist/server.js",
+    "start:prod": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean"
+  },
+  "keywords": [
+    "ai",
+    "financial-services",
+    "whatsapp",
+    "document-processing",
+    "twilio"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.0.0",
+    "langchain": "^0.0.200",
+    "mammoth": "^1.4.0",
+    "multer": "^2.0.0",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.20.1",
+    "pdf-parse": "^1.1.1",
+    "twilio": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^22.13.10",
+    "@types/node-fetch": "^2.6.12",
+    "@types/pdf-parse": "^1.1.4",
+    "nodemon": "^3.1.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

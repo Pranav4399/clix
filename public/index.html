@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Document Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800 p-6 min-h-screen">
+  <div class="max-w-4xl mx-auto space-y-10">
+    <h1 class="text-3xl font-semibold">📂 Document Management</h1>
+
+    <!-- Upload Card -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h2 class="text-xl font-semibold mb-4">Upload New Document</h2>
+      <div class="space-y-4">
+        <label class="flex flex-col border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-400 transition">
+          <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.txt" onchange="updateFileName()" />
+          <span class="text-center text-gray-500" id="fileName">Click to choose a file... (.pdf, .docx, .txt)</span>
+        </label>
+        <button onclick="uploadFile()" id="uploadBtn" class="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 transition">Upload</button>
+        <p id="uploadStatus" class="text-sm font-medium"></p>
+      </div>
+    </div>
+
+    <!-- Documents Table -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h2 class="text-xl font-semibold mb-4">Uploaded Documents</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full border border-gray-200">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="px-4 py-2 text-left text-sm font-semibold">Name</th>
+              <th class="px-4 py-2 text-left text-sm font-semibold">Type</th>
+              <th class="px-4 py-2 text-left text-sm font-semibold">Uploaded At</th>
+            </tr>
+          </thead>
+          <tbody id="documentsTable" class="text-sm divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const fileNameEl = document.getElementById("fileName");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const uploadStatusEl = document.getElementById("uploadStatus");
+    const tableBody = document.getElementById("documentsTable");
+    let pollingInterval;
+
+    function updateFileName() {
+      fileNameEl.textContent = fileInput.files.length ? fileInput.files[0].name : "Click to choose a file... (.pdf, .docx, .txt)";
+    }
+
+    function setUploadStatus(message, isError = false) {
+      uploadStatusEl.textContent = message;
+      uploadStatusEl.className = isError ? 'text-red-500' : 'text-green-600';
+    }
+
+    function setLoading(isLoading) {
+      uploadBtn.disabled = isLoading;
+      uploadBtn.textContent = isLoading ? 'Uploading...' : 'Upload';
+    }
+
+    async function uploadFile() {
+      if (!fileInput.files.length) {
+        setUploadStatus("Please select a file to upload.", true);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      setLoading(true);
+      setUploadStatus("");
+
+      try {
+        const response = await fetch("/documents", { method: "POST", body: formData });
+        const data = await response.json();
+
+        if (response.status === 202 || response.ok) {
+          setUploadStatus("File uploaded successfully!");
+          loadDocuments();
+          startPolling();
+        } else {
+          setUploadStatus(`Upload failed: ${data.error || 'Server error'}`, true);
+        }
+      } catch (err) {
+        setUploadStatus("An error occurred: " + err.message, true);
+      } finally {
+        setLoading(false);
+        fileInput.value = "";
+        updateFileName();
+      }
+    }
+
+    function renderTable(documents) {
+      if (!documents.length) {
+        tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">No documents uploaded yet.</td></tr>`;
+        return;
+      }
+
+      tableBody.innerHTML = documents.map(doc => `
+        <tr>
+          <td class="px-4 py-2">${doc.name}</td>
+          <td class="px-4 py-2">${doc.type}</td>
+          <td class="px-4 py-2">${new Date(doc.uploaded_at).toLocaleString()}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadDocuments() {
+      try {
+        const response = await fetch("/documents");
+        const documents = await response.json();
+        renderTable(documents);
+
+        if (!documents.some(doc => doc.status === 'processing')) {
+          stopPolling();
+        }
+      } catch (err) {
+        console.error("Load error:", err);
+        tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">Failed to load documents.</td></tr>`;
+      }
+    }
+
+    function startPolling() {
+      if (!pollingInterval) {
+        pollingInterval = setInterval(loadDocuments, 5000);
+      }
+    }
+
+    function stopPolling() {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadDocuments();
+      startPolling();
+    });
+  </script>
+</body>
+</html>
