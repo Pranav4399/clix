@@ -1,11 +1,26 @@
-FROM node:18-alpine
+# Dockerfile
 
-# Install Python and build tools for node-gyp
-RUN apk add --no-cache python3 make g++
-
+# ---- Base ----
+FROM node:18-alpine AS base
 WORKDIR /usr/src/app
 COPY package*.json ./
-RUN npm install
+
+# ---- Dependencies ----
+FROM base AS dependencies
+RUN npm install --production
+
+# ---- Build ----
+FROM base AS build
 COPY . .
+RUN npm install
+RUN npm run build
+
+# ---- Release ----
+FROM node:18-alpine AS release
+WORKDIR /usr/src/app
+COPY --from=dependencies /usr/src//app/node_modules ./node_modules
+COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/package.json ./
+
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "dist/server.js"]
