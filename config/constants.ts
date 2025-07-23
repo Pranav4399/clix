@@ -35,5 +35,5 @@ export const searchConfig = {
 export const openaiConfig = {
   model: "gpt-4o-mini",
   max_tokens: 300,
-  temperature: 0.5,
+  temperature: 0.7,
 };

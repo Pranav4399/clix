@@ -36,53 +36,50 @@ export async function storeDocument(
       type: mimetype,
       chunks: chunksCount,
       uploaded_at: new Date(),
+      status: "processing",
     })
     .select();
 
   return document?.[0] || null;
 }
 
-export async function storeDocumentChunks(
-  documentId: string,
-  embeddings: Array<{ content: string; embedding: number[] }>
-) {
-  const batchSize = 100; // Process 100 embeddings at a time
-  for (let i = 0; i < embeddings.length; i += batchSize) {
-    const batch = embeddings.slice(i, i + batchSize);
-    const { error } = await supabase.from("document_chunks").insert(
-      batch.map((embedding) => ({
-        document_id: documentId,
-        content: embedding.content,
-        embedding: embedding.embedding,
-      }))
-    );
 
-    if (error) {
-      console.error(`Error inserting batch ${i / batchSize + 1}:`, error);
-      throw new Error(`Failed to insert document chunks. Check logs for details.`);
-    } else {
-      console.log(`Successfully inserted batch ${i / batchSize + 1} of ${Math.ceil(embeddings.length / batchSize)}`);
-    }
-  }
-}
 
 export async function getDocuments() {
   const { data } = await supabase.from("documents").select("*").order('uploaded_at', { ascending: false });
   return data;
 }
 
+export async function deleteDocumentChunks(documentId: string) {
+    console.log(`Cleaning up chunks for failed document: ${documentId}`);
+    const { error } = await supabase
+        .from("document_chunks")
+        .delete()
+        .eq("document_id", documentId);
+
+    if (error) {
+        // Log this critical error, as it could mean orphaned data
+        console.error(`CRITICAL: Failed to clean up chunks for document ${documentId}:`, error);
+    }
+}
+
 export async function updateDocumentStatus(
   documentId: string,
-  status: 'completed' | 'failed',
+  status: "completed" | "failed",
   chunksCount?: number
 ) {
-  const updateData: { status: string, chunks?: number } = { status };
+  const updateData: { status: string; chunks?: number } = { status };
   if (chunksCount !== undefined) {
     updateData.chunks = chunksCount;
   }
 
-  await supabase
+  const { error } = await supabase
     .from("documents")
     .update(updateData)
     .eq("id", documentId);
+
+  if (error) {
+    console.error(`Error updating document status for id ${documentId}:`, error);
+    throw new Error("Failed to update document status.");
+  }
 }

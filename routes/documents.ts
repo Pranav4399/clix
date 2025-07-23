@@ -1,7 +1,9 @@
 import express from "express";
 import multer from "multer";
-import { getDocuments, storeDocument, storeDocumentChunks, updateDocumentStatus } from "../services/db";
-import { processFile } from "../services/fileProcessor";
+import { getDocuments, storeDocument, updateDocumentStatus, deleteDocumentChunks } from "../services/db";
+import { extractTextFromFile, processAndInsertEmbeddingsInBatches } from "../services/fileProcessor";
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+import { textSplitterConfig } from "../config/constants";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
@@ -9,14 +11,26 @@ const upload = multer({ dest: "uploads/" });
 // This function runs the long process in the background
 const processDocumentInBackground = async (file: any, documentId: string) => {
   try {
-    const embeddings = await processFile(file);
-    console.log(`File processed: ${file.originalname}, Chunks: ${embeddings.length}`);
-    
-    await storeDocumentChunks(documentId, embeddings);
-    await updateDocumentStatus(documentId, 'completed', embeddings.length);
+    // 1. Extract text and split into chunks
+    const text = await extractTextFromFile(file);
+    const splitter = new RecursiveCharacterTextSplitter({
+        chunkSize: textSplitterConfig.chunkSize,
+        chunkOverlap: textSplitterConfig.chunkOverlap
+    });
+    const textChunks = await splitter.createDocuments([text]);
+    console.log(`File processed: ${file.originalname}, Text Chunks: ${textChunks.length}`);
+
+    // 2. Process and insert chunks in a streaming fashion
+    const totalChunksProcessed = await processAndInsertEmbeddingsInBatches(documentId, textChunks);
+
+    // 3. Update final status
+    await updateDocumentStatus(documentId, 'completed', totalChunksProcessed);
     console.log(`Successfully processed and stored document: ${file.originalname}`);
   } catch (err: any) {
     console.error(`Background processing error for ${file.originalname}:`, err.stack);
+    // CRITICAL: Clean up any partially inserted data to prevent corruption
+    await deleteDocumentChunks(documentId);
+    // Now, mark the document as failed
     await updateDocumentStatus(documentId, 'failed');
   }
 };

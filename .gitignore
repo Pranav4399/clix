@@ -3,6 +3,7 @@
 
 # Build output
 /dist
+/uploads
 
 # Logs
 logs
