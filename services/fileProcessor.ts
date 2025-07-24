@@ -1,13 +1,11 @@
 import fs from "fs";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import mammoth from "mammoth";
 import pdf from "pdf-parse";
-import { textSplitterConfig } from "../config/constants";
 import { createEmbedding } from "../config/google";
 import { supabase } from "../config/supabase";
 import { Document } from "langchain/document";
 import pRetry from "p-retry";
-import pLimit from "p-limit";
+import pMap from "p-map"; // 👈 replacing p-limit
 
 export async function extractTextFromFile(file: any) {
   const { mimetype, path } = file;
@@ -28,47 +26,48 @@ export async function extractTextFromFile(file: any) {
   return text;
 }
 
-// Optimized embedding + insertion function
 export async function processAndInsertEmbeddingsInBatches(documentId: string, textChunks: Document[]) {
   const embeddingBatchSize = 15;
   const dbInsertBatchSize = 100;
   const concurrencyLimit = 5;
 
-  const dbInsertQueue = [];
+  const dbInsertQueue: any[] = [];
   const dbInsertPromises: Promise<any>[] = [];
-  const limit = pLimit(concurrencyLimit);
 
   for (let i = 0; i < textChunks.length; i += embeddingBatchSize) {
     const batch = textChunks.slice(i, i + embeddingBatchSize);
-    console.time(`Embedding batch ${i / embeddingBatchSize + 1}`);
+    const batchNumber = Math.floor(i / embeddingBatchSize) + 1;
 
-    const embeddings = await Promise.all(
-      batch.map(chunk =>
-        limit(async () => {
-          const cleanContent = chunk.pageContent.replace(/\u0000/g, "");
-          const embeddingVector = await pRetry(() => createEmbedding(cleanContent), { retries: 3 });
-          return {
-            document_id: documentId,
-            content: cleanContent,
-            embedding: embeddingVector,
-          };
-        })
-      )
+    console.time(`Embedding batch ${batchNumber}`);
+
+    const embeddings = await pMap(
+      batch,
+      async (chunk) => {
+        const cleanContent = chunk.pageContent.replace(/\u0000/g, "");
+        const embeddingVector = await pRetry(() => createEmbedding(cleanContent), { retries: 3 });
+        return {
+          document_id: documentId,
+          content: cleanContent,
+          embedding: embeddingVector,
+        };
+      },
+      { concurrency: concurrencyLimit }
     );
 
-    console.timeEnd(`Embedding batch ${i / embeddingBatchSize + 1}`);
+    console.timeEnd(`Embedding batch ${batchNumber}`);
     dbInsertQueue.push(...embeddings);
 
     if (dbInsertQueue.length >= dbInsertBatchSize) {
       const batchToInsert = dbInsertQueue.splice(0, dbInsertBatchSize);
       console.log(`Queueing batch of ${batchToInsert.length} for DB insertion.`);
-      dbInsertPromises.push(Promise.resolve(supabase.from("document_chunks").insert(batchToInsert).then(res => res)));
+      dbInsertPromises.push(supabase.from("document_chunks").insert(batchToInsert) as unknown as Promise<any>);
+
     }
   }
 
   if (dbInsertQueue.length > 0) {
     console.log(`Queueing final batch of ${dbInsertQueue.length} for DB insertion.`);
-    dbInsertPromises.push(Promise.resolve(supabase.from("document_chunks").insert(dbInsertQueue).then(res => res)));
+    dbInsertPromises.push(supabase.from("document_chunks").insert(dbInsertQueue) as unknown as Promise<any>);
   }
 
   console.log("Waiting for all database insertions to complete...");
