@@ -1,7 +1,7 @@
 // Configuration and constants
 export const systemMessage = {
   role: "system",
-  content: `You are a knowledgeable financial services assistant for our NBFS company partners. 
+  content: `You are a knowledgeable financial services assistant for our NBFC company partners. 
                 You will be given:
                 1. Context from uploaded documents (policies, procedures, product details)
                 2. A partner's question

@@ -60,6 +60,28 @@ export async function deleteDocumentChunks(documentId: string) {
     if (error) {
         // Log this critical error, as it could mean orphaned data
         console.error(`CRITICAL: Failed to clean up chunks for document ${documentId}:`, error);
+        throw error;
+    }
+}
+
+export async function deleteDocument(documentId: string) {
+    try {
+        // First delete all chunks
+        await deleteDocumentChunks(documentId);
+        
+        // Then delete the document
+        const { error } = await supabase
+            .from("documents")
+            .delete()
+            .eq("id", documentId);
+
+        if (error) {
+            console.error(`Failed to delete document ${documentId}:`, error);
+            throw error;
+        }
+    } catch (error) {
+        console.error(`Error deleting document and chunks for ${documentId}:`, error);
+        throw error;
     }
 }
 

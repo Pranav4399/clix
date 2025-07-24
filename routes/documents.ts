@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import { getDocuments, storeDocument, updateDocumentStatus, deleteDocumentChunks } from "../services/db";
+import { getDocuments, storeDocument, updateDocumentStatus, deleteDocumentChunks, deleteDocument } from "../services/db";
 import { extractTextFromFile, processAndInsertEmbeddingsInBatches } from "../services/fileProcessor";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { textSplitterConfig } from "../config/constants";
@@ -66,6 +66,18 @@ router.get("/", async (req: any, res: any) => {
   } catch (err: any) {
     console.error("Documents Error:", err.stack);
     res.status(500).json({ error: "Failed to fetch documents" });
+  }
+});
+
+// Delete document endpoint
+router.delete("/:id", async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    await deleteDocument(id);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete Error:", err.stack);
+    res.status(500).json({ error: "Failed to delete document" });
   }
 });
 
