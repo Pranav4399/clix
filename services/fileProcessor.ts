@@ -5,7 +5,15 @@ import { createEmbedding } from "../config/google";
 import { supabase } from "../config/supabase";
 import { Document } from "langchain/document";
 import pRetry from "p-retry";
-import pMap from "p-map"; // 👈 replacing p-limit
+
+// 🧼 Clean extracted text
+function cleanText(input: string): string {
+  return input
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // control characters
+    .replace(/\uFFFD/g, "") // replacement characters
+    .replace(/\s+/g, " ")   // normalize whitespace
+    .trim();
+}
 
 export async function extractTextFromFile(file: any) {
   const { mimetype, path } = file;
@@ -23,7 +31,7 @@ export async function extractTextFromFile(file: any) {
     throw new Error("Unsupported file type");
   }
 
-  return text;
+  return cleanText(text);
 }
 
 export async function processAndInsertEmbeddingsInBatches(documentId: string, textChunks: Document[]) {
@@ -34,6 +42,8 @@ export async function processAndInsertEmbeddingsInBatches(documentId: string, te
   const dbInsertQueue: any[] = [];
   const dbInsertPromises: Promise<any>[] = [];
 
+  const pMap = (await import("p-map")).default;
+
   for (let i = 0; i < textChunks.length; i += embeddingBatchSize) {
     const batch = textChunks.slice(i, i + embeddingBatchSize);
     const batchNumber = Math.floor(i / embeddingBatchSize) + 1;
@@ -43,7 +53,7 @@ export async function processAndInsertEmbeddingsInBatches(documentId: string, te
     const embeddings = await pMap(
       batch,
       async (chunk) => {
-        const cleanContent = chunk.pageContent.replace(/\u0000/g, "");
+        const cleanContent = cleanText(chunk.pageContent);
         const embeddingVector = await pRetry(() => createEmbedding(cleanContent), { retries: 3 });
         return {
           document_id: documentId,
@@ -61,7 +71,6 @@ export async function processAndInsertEmbeddingsInBatches(documentId: string, te
       const batchToInsert = dbInsertQueue.splice(0, dbInsertBatchSize);
       console.log(`Queueing batch of ${batchToInsert.length} for DB insertion.`);
       dbInsertPromises.push(supabase.from("document_chunks").insert(batchToInsert) as unknown as Promise<any>);
-
     }
   }
 
